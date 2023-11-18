@@ -27,8 +27,8 @@ jobs:
 
       - name: extract build
         run: |
-          docker cp ${{ env.DOCKER_IMAGE_NAME }}-build:/.next ./build
-          docker cp ${{ env.DOCKER_IMAGE_NAME }}-build:/node_modules ./build
+          docker cp ${{ env.DOCKER_IMAGE_NAME }}-build:/app/.next ./build
+          docker cp ${{ env.DOCKER_IMAGE_NAME }}-build:/app/node_modules ./build
 
       - name: setup build
         run: |
