@@ -33,9 +33,7 @@ jobs:
       - name: setup build
         run: |
           mv ./docker/run.Dockerfile ./build/Dockerfile
-          mv public ./build/public
-          mv next.config.js ./build/next.config.js
-          mv package.json ./build/package.json
+          mv public next.config.mjs package.json ./build
 
       - name: upload artifact
         uses: actions/upload-artifact@v3
