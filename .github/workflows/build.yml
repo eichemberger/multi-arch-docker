@@ -1,0 +1,134 @@
+name: MultiArch Build
+on:
+  push:
+    branches:
+      - 'main'
+jobs:
+  build-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOCKER_IMAGE_NAME: dummy
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v2
+
+      - name: setup
+        run: |
+          mv ./docker/build.Dockerfile ./Dockerfile 
+          mkdir build
+
+      - name: build utility image
+        run: docker build -t ${{ env.DOCKER_IMAGE_NAME }} .
+
+      - name: build app
+        run: docker run --name ${{ env.DOCKER_IMAGE_NAME }}-build ${{ env.DOCKER_IMAGE_NAME }}
+
+      - name: extract build
+        run: |
+          docker cp ${{ env.DOCKER_IMAGE_NAME }}-build:/.next ./build
+          docker cp ${{ env.DOCKER_IMAGE_NAME }}-build:/node_modules ./build
+
+      - name: setup build
+        run: |
+          mv ./docker/run.Dockerfile ./build/Dockerfile
+          mv public ./build/public
+          mv next.config.js ./build/next.config.js
+          mv package.json ./build/package.json
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: ./build
+
+  build-images:
+    runs-on: ubuntu-latest
+    needs: build-app
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      ECR_IMAGE_NAME: t3-dummy
+      AWS_REGION: us-east-1
+      ROLE: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/CICD_ECR
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - name: get artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+        
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set platform value
+        id: build-docker-tag
+        run: echo "tag=$(echo ${{ matrix.platform  }} | sed 's/\//-/g')" >> $GITHUB_OUTPUT
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.build-docker-tag.outputs.tag  }}-${{ github.run_number }}
+            type=raw,value=latest
+    
+      - uses: docker/setup-buildx-action@v2
+        with:
+          platforms: ${{ matrix.platform }}
+  
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          platforms: ${{ matrix.platform }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+    
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: build-images
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      ECR_IMAGE_NAME: t3-dummy
+      AWS_REGION: us-east-1
+      ROLE: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/CICD_ECR
+    steps:      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ env.ROLE }}
+        aws-region: ${{ env.AWS_REGION }}
+      
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: create manifest
+      run: |
+        docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-arm64-${{ github.run_number }}
+        docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-amd64-${{ github.run_number }}
+        docker manifest create ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:${{ github.run_number }} \
+          ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-arm64-${{ github.run_number }} \
+          ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-amd64-${{ github.run_number }}
+        docker manifest push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:${{ github.run_number }}
