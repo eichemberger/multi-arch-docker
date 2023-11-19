@@ -46,43 +46,11 @@ jobs:
           docker rm ${{ env.DOCKER_IMAGE_NAME }}-build
           docker rmi ${{ env.DOCKER_IMAGE_NAME }}
 
-      - name: compress build
-        run: |
-          tar -czvf build.tar.gz ./build
-
-      - name: upload build
-        uses: actions/upload-artifact@v3
-        with:
-          name: build
-          path: ./build.tar.gz
-
-  push:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      DOCKER_IMAGE_NAME: dummy
-      ECR_IMAGE_NAME: t3-dummy
-      AWS_REGION: us-east-1
-      ROLE: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/CICD_ECR
-    steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.ROLE }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Download build
-        uses: actions/download-artifact@v3
-        with:
-          name: build
-
-      - name: Extract build
-        run: |
-          tar -xzvf build/build.tar.gz
-          rm build.tar.gz
 
       - name: Login to Amazon ECR
         id: login-ecr
