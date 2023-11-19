@@ -90,7 +90,6 @@ jobs:
 
       - name: cleanup buildx
         run: |
-          docker buildx rm
           docker rmi ${{ steps.meta.outputs.tags }}
 
       - name: Docker meta
