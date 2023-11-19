@@ -82,7 +82,7 @@ jobs:
 
       - name: Extract build
         run: |
-          tar -xzvf build/build.tar.gz
+          tar -xzvf build.tar.gz
           rm build.tar.gz
 
       - name: Login to Amazon ECR
@@ -107,7 +107,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./build
+          context: .
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
