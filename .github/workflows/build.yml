@@ -46,8 +46,6 @@ jobs:
           docker rm ${{ env.DOCKER_IMAGE_NAME }}-build
           docker rmi ${{ env.DOCKER_IMAGE_NAME }}
 
-      - run: cd build
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -58,69 +56,19 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # - name: upload artifact
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: build
-      #     path: ./build        
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}
-          tags: |
-            type=raw,value=linux-amd64-${{ github.run_number }}
-    
-      - uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/amd64
-  
-      - name: Build and push
-        uses: docker/build-push-action@v4
-        with:
-          context: ./build
-          push: true
-          platforms: linux/amd64
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          provenance: false
-
-      # - name: cleanup buildx
-      #   run: |
-      #     docker rmi ${{ steps.meta.outputs.tags }}
-
-      - name: Docker meta
-        id: meta-arm
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}
-          tags: |
-            type=raw,value=linux-arm64-${{ github.run_number }}
-
-      - uses: docker/setup-buildx-action@v2
-        with:
-          platforms: linux/arm64
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
           context: ./build
           push: true
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta-arm.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
-
-      - name: create manifest
-        run: |
-          docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-arm64-${{ github.run_number }}
-          docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-amd64-${{ github.run_number }}
-          docker manifest create ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:${{ github.run_number }} \
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-arm64-${{ github.run_number }} \
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:linux-amd64-${{ github.run_number }}
-          docker manifest push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_IMAGE_NAME }}:${{ github.run_number }}
