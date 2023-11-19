@@ -46,6 +46,8 @@ jobs:
           docker rm ${{ env.DOCKER_IMAGE_NAME }}-build
           docker rmi ${{ env.DOCKER_IMAGE_NAME }}
 
+      - run: cd build
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
