@@ -88,9 +88,9 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
 
-      - name: cleanup buildx
-        run: |
-          docker rmi ${{ steps.meta.outputs.tags }}
+      # - name: cleanup buildx
+      #   run: |
+      #     docker rmi ${{ steps.meta.outputs.tags }}
 
       - name: Docker meta
         id: meta-arm
