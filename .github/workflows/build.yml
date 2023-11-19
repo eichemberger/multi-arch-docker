@@ -80,7 +80,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ./build
           push: true
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
@@ -109,7 +109,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
-          context: .
+          context: ./build
           push: true
           platforms: linux/arm64
           tags: ${{ steps.meta-arm.outputs.tags }}
